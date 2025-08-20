@@ -1,0 +1,28 @@
+<html>
+<head>
+    <title>Live Clock Example</title>
+</head>
+<body>
+    <h1>Current time</h1>
+    <button id="datebtn" onclick="Showdate()">Show Date</button>
+    <button id="timebtn" onclick="Showtime()">Show Time</button>
+    <p id="time"></p>
+    <p id="date"></p>
+    <script>
+        function updateTime() {
+            let now = new Date();
+            document.getElementById("time").innerHTML = now.toLocaleTimeString();
+        }
+        function Showdate() {
+            let now = new Date();
+            document.getElementById("date").innerHTML = now.toLocaleDateString();
+        }
+        function Showtime() {
+            let now = new Date();
+            document.getElementById("time").innerHTML = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime(); 
+    </script>
+</body>
+</html>
