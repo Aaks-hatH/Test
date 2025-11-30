@@ -1,28 +1,119 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Live Clock Example</title>
+    <meta charset="UTF-8" />
+    <title>3D Solar System</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-    <h1>Current time</h1>
-    <button id="datebtn" onclick="Showdate()">Show Date</button>
-    <button id="timebtn" onclick="Showtime()">Show Time</button>
-    <p id="time"></p>
-    <p id="date"></p>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.141.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.141.0/examples/js/controls/OrbitControls.js"></script>
+
     <script>
-        function updateTime() {
-            let now = new Date();
-            document.getElementById("time").innerHTML = now.toLocaleTimeString();
+        // --- 2. BASIC SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000); // Black background for space
+
+        const camera = new THREE.PerspectiveCamera(
+            75, // Field of View
+            window.innerWidth / window.innerHeight, // Aspect Ratio
+            0.1, // Near clip
+            1000 // Far clip
+        );
+        camera.position.z = 50; // Move camera back to see the scene
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- 3. INTERACTIVE CONTROLS ---
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // Adds smooth deceleration
+
+        // --- 4. CREATING THE OBJECTS ---
+
+        // The Sun
+        const sunGeometry = new THREE.SphereGeometry(5, 32, 32);
+        // MeshBasicMaterial is not affected by light, so it glows.
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        scene.add(sun);
+
+        // Add a point light at the Sun's position to light the planets
+        const sunLight = new THREE.PointLight(0xffffff, 2, 500);
+        sunLight.position.set(0, 0, 0);
+        scene.add(sunLight);
+        
+        // 
+
+        /**
+         * Helper function to create planets
+         * @param {number} radius - Radius of the planet sphere
+         * @param {number} orbitDistance - Distance from the sun
+         * @param {number} color - Hex color of the planet
+         */
+        function createPlanet(radius, orbitDistance, color, textureUrl = null) {
+            // Create a pivot object. The planet will be a child of this.
+            // We rotate the pivot to make the planet orbit.
+            const orbitGroup = new THREE.Object3D();
+            scene.add(orbitGroup);
+
+            // Create the planet geometry and material
+            const planetGeometry = new THREE.SphereGeometry(radius, 32, 32);
+            // MeshStandardMaterial is affected by light, which is realistic.
+            const planetMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 1 });
+            const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+            
+            // Position the planet along the x-axis relative to its orbit pivot
+            planet.position.x = orbitDistance;
+            
+            // Add the planet to the orbit group
+            orbitGroup.add(planet);
+
+            return { orbitGroup, planet };
         }
-        function Showdate() {
-            let now = new Date();
-            document.getElementById("date").innerHTML = now.toLocaleDateString();
-        }
-        function Showtime() {
-            let now = new Date();
-            document.getElementById("time").innerHTML = now.toLocaleTimeString();
-        }
-        setInterval(updateTime, 1000);
-        updateTime(); 
+
+        // Create Earth and Mars
+        const earthData = createPlanet(2, 20, 0x2233ff); // A blue Earth
+        const marsData = createPlanet(1.5, 30, 0xff4500); // A reddish Mars
+
+        // --- 5. ANIMATION LOOP ---
+        // This function is called 60 times per second
+        const animate = function () {
+            requestAnimationFrame(animate);
+
+            // 1. Rotate the sun slowly on its axis
+            sun.rotation.y += 0.001;
+
+            // 2. Simulate the Earth's orbit by rotating its pivot group
+            earthData.orbitGroup.rotation.y += 0.005; // Orbital speed
+            // Add Earth's self-rotation
+            earthData.planet.rotation.y += 0.01;
+
+            // 3. Simulate Mars' orbit
+            marsData.orbitGroup.rotation.y += 0.003; // Slower orbit than Earth
+            marsData.planet.rotation.y += 0.008;
+
+            // Update controls for damping
+            controls.update();
+            
+            // Render the scene from the camera's perspective
+            renderer.render(scene, camera);
+        };
+
+        animate(); // Start the animation loop
+
+        // --- 6. HANDLE WINDOW RESIZING ---
+        window.addEventListener("resize", () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
     </script>
 </body>
 </html>
