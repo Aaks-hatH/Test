@@ -1,119 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>3D Solar System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Solar System</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; }
-        canvas { display: block; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            z-index: 100;
+            pointer-events: none;
+            text-shadow: 0 0 5px #000;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        p {
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+
+        /* Tooltip styling */
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: none;
+            pointer-events: none;
+            font-size: 14px;
+            white-space: nowrap;
+            z-index: 101;
+        }
     </style>
 </head>
 <body>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.141.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.141.0/examples/js/controls/OrbitControls.js"></script>
+    <div id="info">
+        <h1>Solar System</h1>
+        <p>Left Click: Rotate | Right Click: Pan | Scroll: Zoom | Hover: Identify</p>
+    </div>
 
-    <script>
-        // --- 2. BASIC SCENE SETUP ---
+    <!-- The Tooltip Element -->
+    <div id="tooltip"></div>
+
+    <!-- Import Three.js as an ES module -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Configuration ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000); // Black background for space
-
-        const camera = new THREE.PerspectiveCamera(
-            75, // Field of View
-            window.innerWidth / window.innerHeight, // Aspect Ratio
-            0.1, // Near clip
-            1000 // Far clip
-        );
-        camera.position.z = 50; // Move camera back to see the scene
-
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Renderer Setup
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // --- 3. INTERACTIVE CONTROLS ---
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // Adds smooth deceleration
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        camera.position.set(0, 40, 60);
 
-        // --- 4. CREATING THE OBJECTS ---
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x333333);
+        scene.add(ambientLight);
 
-        // The Sun
-        const sunGeometry = new THREE.SphereGeometry(5, 32, 32);
-        // MeshBasicMaterial is not affected by light, so it glows.
-        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        // The Sun (Point Light + Mesh)
+        const sunGeometry = new THREE.SphereGeometry(4, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
         const sun = new THREE.Mesh(sunGeometry, sunMaterial);
         scene.add(sun);
 
-        // Add a point light at the Sun's position to light the planets
-        const sunLight = new THREE.PointLight(0xffffff, 2, 500);
-        sunLight.position.set(0, 0, 0);
-        scene.add(sunLight);
-        
-        // 
+        // Light emitting from the sun
+        const sunLight = new THREE.PointLight(0xFFFFFF, 2, 300);
+        sun.add(sunLight);
 
-        /**
-         * Helper function to create planets
-         * @param {number} radius - Radius of the planet sphere
-         * @param {number} orbitDistance - Distance from the sun
-         * @param {number} color - Hex color of the planet
-         */
-        function createPlanet(radius, orbitDistance, color, textureUrl = null) {
-            // Create a pivot object. The planet will be a child of this.
-            // We rotate the pivot to make the planet orbit.
-            const orbitGroup = new THREE.Object3D();
-            scene.add(orbitGroup);
+        // --- Planet Data (Relative Scale for Visuals) ---
+        // Distance: Distance from sun
+        // Size: Radius of planet
+        // Speed: Orbit speed
+        const planetsData = [
+            { name: "Mercury", color: 0xA5A5A5, size: 0.8, distance: 10, speed: 0.04 },
+            { name: "Venus", color: 0xE1B376, size: 1.2, distance: 15, speed: 0.015 },
+            { name: "Earth", color: 0x2233FF, size: 1.3, distance: 20, speed: 0.01 },
+            { name: "Mars", color: 0xFF2200, size: 0.9, distance: 25, speed: 0.008 },
+            { name: "Jupiter", color: 0xD6A570, size: 3.5, distance: 35, speed: 0.002 },
+            { name: "Saturn", color: 0xF4D03F, size: 3, distance: 50, speed: 0.0009, ring: { inner: 3.5, outer: 5, color: 0xC0A360 } },
+            { name: "Uranus", color: 0x4FD0E7, size: 2, distance: 65, speed: 0.0004 },
+            { name: "Neptune", color: 0x2424D1, size: 1.9, distance: 80, speed: 0.0001 }
+        ];
 
-            // Create the planet geometry and material
-            const planetGeometry = new THREE.SphereGeometry(radius, 32, 32);
-            // MeshStandardMaterial is affected by light, which is realistic.
-            const planetMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 1 });
-            const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-            
-            // Position the planet along the x-axis relative to its orbit pivot
-            planet.position.x = orbitDistance;
-            
-            // Add the planet to the orbit group
-            orbitGroup.add(planet);
+        const planets = []; // Array to store planet meshes for interaction
+        const planetPivots = []; // Array to store the pivot points for rotation
 
-            return { orbitGroup, planet };
+        // --- Helper Function to Create Orbits ---
+        function createOrbit(radius) {
+            const curve = new THREE.EllipseCurve(
+                0, 0,            // ax, aY
+                radius, radius,  // xRadius, yRadius
+                0, 2 * Math.PI,  // aStartAngle, aEndAngle
+                false,           // aClockwise
+                0                // aRotation
+            );
+            const points = curve.getPoints(100);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.3 });
+            const orbit = new THREE.Line(geometry, material);
+            orbit.rotation.x = -Math.PI / 2;
+            return orbit;
         }
 
-        // Create Earth and Mars
-        const earthData = createPlanet(2, 20, 0x2233ff); // A blue Earth
-        const marsData = createPlanet(1.5, 30, 0xff4500); // A reddish Mars
+        // --- Generate Planets ---
+        planetsData.forEach(data => {
+            // 1. Create the Orbit Path
+            scene.add(createOrbit(data.distance));
 
-        // --- 5. ANIMATION LOOP ---
-        // This function is called 60 times per second
-        const animate = function () {
+            // 2. Create the Pivot (Invisible center for rotation)
+            const pivot = new THREE.Object3D();
+            pivot.rotation.y = Math.random() * (Math.PI * 2); // Random start position
+            scene.add(pivot);
+            planetPivots.push({ pivot: pivot, speed: data.speed, name: data.name });
+
+            // 3. Create the Planet Mesh
+            const geometry = new THREE.SphereGeometry(data.size, 32, 32);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: data.color,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            const planet = new THREE.Mesh(geometry, material);
+            
+            // Position planet on the pivot
+            planet.position.x = data.distance;
+            
+            // Add custom data for raycasting
+            planet.userData = { name: data.name, speed: data.speed };
+            
+            pivot.add(planet);
+            planets.push(planet);
+
+            // 4. Create Saturn's Rings (Special Case)
+            if (data.ring) {
+                const ringGeo = new THREE.RingGeometry(data.ring.inner, data.ring.outer, 32);
+                const ringMat = new THREE.MeshBasicMaterial({ 
+                    color: data.ring.color, 
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 2;
+                planet.add(ring);
+            }
+        });
+
+        // --- Starfield Background ---
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsCount = 5000;
+        const posArray = new Float32Array(starsCount * 3);
+        
+        for(let i = 0; i < starsCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 500; // Spread stars far out
+        }
+        
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starsMaterial = new THREE.PointsMaterial({size: 0.15, color: 0xffffff});
+        const starsMesh = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(starsMesh);
+
+        // --- Interaction Logic (Raycaster) ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+        let hoveredPlanet = null;
+
+        function onMouseMove(event) {
+            // Normalize mouse coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Move tooltip
+            tooltip.style.left = event.clientX + 15 + 'px';
+            tooltip.style.top = event.clientY + 15 + 'px';
+        }
+
+        window.addEventListener('mousemove', onMouseMove, false);
+
+        // --- Animation Loop ---
+        function animate() {
             requestAnimationFrame(animate);
 
-            // 1. Rotate the sun slowly on its axis
-            sun.rotation.y += 0.001;
+            // Rotate Planets around Sun
+            planetPivots.forEach(item => {
+                // If hovered, we can choose to stop rotation, or keep it. 
+                // Currently keeping it but interactive identification is key.
+                item.pivot.rotation.y += item.speed;
+            });
 
-            // 2. Simulate the Earth's orbit by rotating its pivot group
-            earthData.orbitGroup.rotation.y += 0.005; // Orbital speed
-            // Add Earth's self-rotation
-            earthData.planet.rotation.y += 0.01;
+            // Rotate Planets on their own axis
+            planets.forEach(planet => {
+                planet.rotation.y += 0.02;
+            });
 
-            // 3. Simulate Mars' orbit
-            marsData.orbitGroup.rotation.y += 0.003; // Slower orbit than Earth
-            marsData.planet.rotation.y += 0.008;
+            // Sun Rotation
+            sun.rotation.y += 0.004;
 
-            // Update controls for damping
+            // Raycasting
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(planets);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if (hoveredPlanet !== object) {
+                    hoveredPlanet = object;
+                    tooltip.style.display = 'block';
+                    tooltip.innerHTML = `<strong>${object.userData.name}</strong>`;
+                    document.body.style.cursor = 'pointer';
+                    
+                    // Highlight effect
+                    object.material.emissive.setHex(0x333333);
+                }
+            } else {
+                if (hoveredPlanet) {
+                    // Remove highlight
+                    hoveredPlanet.material.emissive.setHex(0x000000);
+                    hoveredPlanet = null;
+                    tooltip.style.display = 'none';
+                    document.body.style.cursor = 'default';
+                }
+            }
+
             controls.update();
-            
-            // Render the scene from the camera's perspective
             renderer.render(scene, camera);
-        };
+        }
 
-        animate(); // Start the animation loop
-
-        // --- 6. HANDLE WINDOW RESIZING ---
-        window.addEventListener("resize", () => {
+        // --- Resize Handler ---
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        animate();
     </script>
 </body>
 </html>
